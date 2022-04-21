@@ -1,8 +1,8 @@
-from db_postgresql import DBPostgresql
 import transliterate
 import pandas as pd
 import numpy as np
 import datetime
+from db_postgresql import DBPostgresql
 
 
 def eval_type(values: list, headers: np.ndarray) -> dict:
@@ -35,5 +35,5 @@ def parse_excel_into_db(path_file: str):
 
 
 if __name__ == "__main__":
-    parse_excel_into_db('Исходные данные.xlsx')
+    parse_excel_into_db("Исходные данные.xlsx")
 
