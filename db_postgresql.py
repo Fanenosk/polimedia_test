@@ -23,7 +23,7 @@ class DBPostgresql:
         self.password = 'test'
         self.host = 'localhost'
 
-    def м(function):
+    def select_with_headers(function):
         def wrapper(self, *args):
             sql = function(self, *args)
             try:
