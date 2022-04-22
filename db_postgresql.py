@@ -104,53 +104,78 @@ class DBPostgresql:
 
     @select_with_headers
     def get_agr_values(self):
-        return "select * from (select 'week' as period_type, " \
-               "to_char(date_trunc('week', prodazhi2.sale_date), 'YYYY.MM.DD') as start_date ," \
-               "to_char(date_trunc('week', prodazhi2.sale_date) + interval '1 week', 'YYYY.MM.DD') as end_date," \
-               "p2.fio as salesman_fio," \
-               "p3.fio as chif_fio," \
-               "sum(prodazhi2.quantity) as sales_count," \
-               "sum(prodazhi2.final_price) as sales_sum," \
-               "prodazhi2.item_id as max_overcharge_item," \
-               "max((round(prodazhi2.final_price/prodazhi2.quantity/prodazhi2.price::numeric,2)-1)*100) as max_overcharge_percent " \
-               "from " \
-               "(select * from (select * from prodazhi p " \
+        return "select * from " \
+               "(select DISTINCT on (table_prodazhi.start_date, table_prodazhi.end_date, " \
+               "table_prodazhi.salesman_id) 'month' as period_type," \
+               "table_prodazhi.start_date, table_prodazhi.end_date, prodavtsy.fio as salesman_fio , " \
+               "shef.fio as chif_fio , table_aggr.sales_count," \
+               "table_aggr.sales_sum, table_prodazhi.item_id,table_prodazhi.max_overcharge_percent from (" \
+               "(select to_char(date_trunc('month', p.sale_date), 'YYYY.MM.DD') as start_date, " \
+               "to_char(date_trunc('month', p.sale_date) + interval '1 month','YYYY.MM.DD') as end_date, *, " \
+               "p.final_price/p.quantity - t.price as max_overcharge," \
+               "(round(p.final_price/p.quantity/t.price::numeric,2)-1)*100 as max_overcharge_percent from prodazhi p " \
                "join tovary t on (p.item_id = t.id) " \
-               "where t.is_actual = 1 " \
-               "union all select * from prodazhi p " \
+               "where p.item_id = t.id " \
+               "and t.is_actual = 1 " \
+               "and p.sale_date >= t.sdate " \
+               "and p.sale_date <= t.edate " \
+               "union all select to_char(date_trunc('month', p.sale_date),'YYYY.MM.DD') as start_date, " \
+               "to_char(date_trunc('month', p.sale_date) + interval '1 month','YYYY.MM.DD') as end_date,*, " \
+               "p.final_price/p.quantity - u.price as max_overcharge," \
+               "(round(p.final_price/p.quantity/u.price::numeric,2)-1)*100 as max_overcharge_percent from prodazhi p " \
                "join uslugi u on (p.item_id = u.id) " \
-               "where u.is_actual = 1) as prodazhi1) as prodazhi2," \
-               "prodavtsy p2," \
-               "otdely o " \
-               "join prodavtsy p3 on (o.dep_chif_id = p3.id) " \
-               "where date_trunc('week', prodazhi2.sale_date) >= prodazhi2.sdate " \
-               "and date_trunc('week', prodazhi2.sale_date) <= prodazhi2.edate " \
-               "and prodazhi2.salesman_id = p2.id " \
-               "and p2.department_id = o.department_id " \
-               "group by prodazhi2.sale_date, p2.fio, p3.fio, prodazhi2.item_id " \
-               "union all select 'month' as period_type, " \
-               "to_char(date_trunc('month', prodazhi2.sale_date), 'YYYY.MM.DD') as start_date , " \
-               "to_char(date_trunc('month', prodazhi2.sale_date) + interval '1 month', 'YYYY.MM.DD') as end_date, " \
-               "p2.fio as salesman_fio, " \
-               "p3.fio as chif_fio, " \
-               "sum(prodazhi2.quantity) as sales_count," \
-               "sum(prodazhi2.final_price) as sales_sum," \
-               "prodazhi2.item_id as max_overcharge_item," \
-               "max((round(prodazhi2.final_price/prodazhi2.quantity/prodazhi2.price::numeric,2)-1)*100) as max_overcharge_percent " \
-               "from " \
-               "(select * from (select * from prodazhi p " \
+               "where p.item_id = u.id " \
+               "and u.is_actual = 1 " \
+               "and p.sale_date >= u.sdate " \
+               "and p.sale_date <= u.edate) as table_prodazhi " \
+               "join (select to_char(date_trunc('month', p2.sale_date),'YYYY.MM.DD') as start_date, " \
+               "to_char(date_trunc('month', p2.sale_date) + interval '1 month','YYYY.MM.DD') as end_date," \
+               "salesman_id,sum(p2.quantity) as sales_count,sum(p2.final_price) as sales_sum from prodazhi p2 " \
+               "group by date_trunc('month', p2.sale_date), p2.salesman_id) as table_aggr " \
+               "on (table_aggr.salesman_id = table_prodazhi.salesman_id) " \
+               "and (table_aggr.start_date = table_prodazhi.start_date) " \
+               "and (table_aggr.end_date = table_prodazhi.end_date))," \
+               "prodavtsy " \
+               "join otdely on (prodavtsy.department_id  = otdely.department_id) " \
+               "join prodavtsy shef on (otdely.dep_chif_id = shef.id) " \
+               "where table_prodazhi.salesman_id = prodavtsy.id " \
+               "order by table_prodazhi.start_date, table_prodazhi.end_date, table_prodazhi.salesman_id, " \
+               "table_prodazhi.max_overcharge desc) as result_table " \
+               "union all " \
+               "select * from " \
+               "(select DISTINCT on (table_prodazhi.start_date, table_prodazhi.end_date, table_prodazhi.salesman_id) " \
+               "'week' as period_type, " \
+               "table_prodazhi.start_date, table_prodazhi.end_date, prodavtsy.fio as salesman_fio , " \
+               "shef.fio as chif_fio , table_aggr.sales_count, " \
+               "table_aggr.sales_sum, table_prodazhi.item_id,table_prodazhi.max_overcharge_percent from (" \
+               "(select to_char(date_trunc('week', p.sale_date), 'YYYY.MM.DD') as start_date, " \
+               "to_char(date_trunc('week', p.sale_date) + interval '1 week','YYYY.MM.DD') as end_date, *, " \
+               "p.final_price/p.quantity - t.price as max_overcharge," \
+               "(round(p.final_price/p.quantity/t.price::numeric,2)-1)*100 as max_overcharge_percent from prodazhi p " \
                "join tovary t on (p.item_id = t.id) " \
-               "where t.is_actual = 1 " \
-               "union all select * from prodazhi p " \
+               "where p.item_id = t.id " \
+               "and t.is_actual = 1 " \
+               "and p.sale_date >= t.sdate " \
+               "and p.sale_date <= t.edate " \
+               "union all select to_char(date_trunc('week', p.sale_date),'YYYY.MM.DD') as start_date, " \
+               "to_char(date_trunc('week', p.sale_date) + interval '1 week','YYYY.MM.DD') as end_date,*, " \
+               "p.final_price/p.quantity - u.price as max_overcharge, " \
+               "(round(p.final_price/p.quantity/u.price::numeric,2)-1)*100 as max_overcharge_percent from prodazhi p " \
                "join uslugi u on (p.item_id = u.id) " \
-               "where u.is_actual = 1) as prodazhi1) as prodazhi2," \
-               "prodavtsy p2," \
-               "otdely o " \
-               "join prodavtsy p3 on (o.dep_chif_id = p3.id) " \
-               "where date_trunc('month', prodazhi2.sale_date) >= prodazhi2.sdate " \
-               "and date_trunc('month', prodazhi2.sale_date) <= prodazhi2.edate " \
-               "and prodazhi2.salesman_id = p2.id " \
-               "and p2.department_id = o.department_id " \
-               "group by prodazhi2.sale_date, p2.fio, p3.fio, prodazhi2.item_id) as result_sql " \
-               "order by result_sql.salesman_fio, result_sql.start_date"
+               "where p.item_id = u.id and u.is_actual = 1 " \
+               "and p.sale_date >= u.sdate " \
+               "and p.sale_date <= u.edate) as table_prodazhi " \
+               "join (select to_char(date_trunc('week', p2.sale_date),'YYYY.MM.DD') as start_date, " \
+               "to_char(date_trunc('week', p2.sale_date) + interval '1 week','YYYY.MM.DD') as end_date, salesman_id," \
+               "sum(p2.quantity) as sales_count,sum(p2.final_price) as sales_sum from prodazhi p2 " \
+               "group by date_trunc('week', p2.sale_date), p2.salesman_id) as table_aggr " \
+               "on (table_aggr.salesman_id = table_prodazhi.salesman_id) " \
+               "and (table_aggr.start_date = table_prodazhi.start_date) " \
+               "and (table_aggr.end_date = table_prodazhi.end_date)),prodavtsy " \
+               "join otdely on (prodavtsy.department_id  = otdely.department_id) " \
+               "join prodavtsy shef on (otdely.dep_chif_id = shef.id) " \
+               "where table_prodazhi.salesman_id = prodavtsy.id " \
+               "order by table_prodazhi.start_date, table_prodazhi.end_date, table_prodazhi.salesman_id, " \
+               "table_prodazhi.max_overcharge desc) as result_table " \
+               "order by salesman_fio, start_date"
 
