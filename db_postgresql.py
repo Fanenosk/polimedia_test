@@ -18,19 +18,19 @@ from psycopg2.extras import execute_values
 
 class DBPostgresql:
     def __init__(self):
-        self.dbname = 'polimedia_test'
-        self.user = 'test_user'
-        self.password = 'test'
-        self.host = 'localhost'
+        self.__dbname = 'polimedia_test'
+        self.__user = 'test_user'
+        self.__password = 'test'
+        self.__host = 'localhost'
 
     def select_with_headers(function):
         def wrapper(self, *args):
             sql = function(self, *args)
             try:
-                with closing(psycopg2.connect(dbname=self.dbname,
-                                              user=self.user,
-                                              password=self.password,
-                                              host=self.host)) as conn:
+                with closing(psycopg2.connect(dbname=self.__dbname,
+                                              user=self.__user,
+                                              password=self.__password,
+                                              host=self.__host)) as conn:
                     with conn.cursor() as cursor:
                         try:
                             conn.autocommit = True
@@ -48,10 +48,10 @@ class DBPostgresql:
         def wrapper(self, **kwargs):
             sql = function(self, **kwargs)
             try:
-                with closing(psycopg2.connect(dbname=self.dbname,
-                                              user=self.user,
-                                              password=self.password,
-                                              host=self.host)) as conn:
+                with closing(psycopg2.connect(dbname=self.__dbname,
+                                              user=self.__user,
+                                              password=self.__password,
+                                              host=self.__host)) as conn:
                     with conn.cursor() as cursor:
                         try:
                             cursor.execute(sql)
@@ -66,10 +66,10 @@ class DBPostgresql:
         def wrapper(self, **kwargs):
             sql, data = function(self, **kwargs)
             try:
-                with closing(psycopg2.connect(dbname=self.dbname,
-                                              user=self.user,
-                                              password=self.password,
-                                              host=self.host)) as conn:
+                with closing(psycopg2.connect(dbname=self.__dbname,
+                                              user=self.__user,
+                                              password=self.__password,
+                                              host=self.__host)) as conn:
                     with conn.cursor() as cursor:
                         try:
                             conn.autocommit = True
